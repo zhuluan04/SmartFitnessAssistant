@@ -1,0 +1,23 @@
+[project]
+name = "smart-fitness-diet-agent"
+version = "0.1.0"
+description = "智能健身食谱与卡路里总结 Agent — 识别食材、推荐食谱、计算卡路里"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain>=1.0.0",
+    "langchain-openai>=0.3.0",
+    "langchain-tavily>=0.2.0",
+    "python-dotenv>=1.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "langsmith>=0.2.0",
+]
