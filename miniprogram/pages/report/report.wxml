@@ -1,0 +1,23 @@
+<!--pages/report/report.wxml - 报告页-->
+<view class="page-container">
+  <!-- 耗时信息 -->
+  <view class="meta-bar card">
+    <text class="meta-icon">⏱️</text>
+    <text>分析耗时 {{elapsed}} 秒</text>
+  </view>
+
+  <!-- Markdown 报告 -->
+  <view class="card report-card">
+    <mp-html content="{{reportHtml}}" />
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="action-group">
+    <button class="btn-primary" bindtap="reAnalyze">
+      重新分析 🔄
+    </button>
+    <button class="btn-secondary" bindtap="goBack">
+      返回首页
+    </button>
+  </view>
+</view>

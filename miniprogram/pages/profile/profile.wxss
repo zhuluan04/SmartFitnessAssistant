@@ -1,0 +1,87 @@
+/* pages/profile/profile.wxss - 我的页样式 */
+
+.page-container {
+  padding-bottom: 40rpx;
+}
+
+/* 头像区 */
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60rpx 0 40rpx;
+}
+
+.avatar-circle {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4ECDC4, #2BA89C);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  margin-bottom: 20rpx;
+}
+
+.user-name {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #2D3436;
+  margin-bottom: 8rpx;
+}
+
+/* 健身目标选择 */
+.goal-group {
+  display: flex;
+  gap: 16rpx;
+}
+
+.goal-item {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  border-radius: 32rpx;
+  font-size: 26rpx;
+  background: #F0FFF9;
+  color: #636E72;
+  border: 2rpx solid #E8F5F0;
+}
+
+.goal-item.active {
+  background: #4ECDC4;
+  color: #FFFFFF;
+  border-color: #4ECDC4;
+}
+
+/* 功能菜单 */
+.menu-card {
+  padding: 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 32rpx;
+  border-bottom: 1rpx solid #E8F5F0;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-icon {
+  font-size: 36rpx;
+  margin-right: 20rpx;
+}
+
+.menu-text {
+  flex: 1;
+  font-size: 28rpx;
+  color: #2D3436;
+}
+
+.menu-arrow {
+  font-size: 32rpx;
+  color: #B2BEC3;
+}

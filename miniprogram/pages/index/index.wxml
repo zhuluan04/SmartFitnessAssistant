@@ -1,0 +1,56 @@
+<!--pages/index/index.wxml - 首页-->
+<view class="page-container">
+  <view class="page-title">🥗 智能食谱分析</view>
+  <view class="text-secondary" style="padding: 0 24rpx 24rpx;">
+    输入食材或拍照识别，获取专属健身食谱
+  </view>
+
+  <!-- 输入卡片 -->
+  <view class="card">
+    <textarea
+      class="input-area"
+      placeholder="输入食材清单，如：鸡胸肉150g、西兰花100g"
+      value="{{textInput}}"
+      bindinput="onTextInput"
+      maxlength="500"
+      auto-height
+    />
+
+    <!-- 图片上传区 -->
+    <view class="image-upload" bindtap="chooseImage" wx:if="{{!hasImage}}">
+      <view class="upload-icon">📷</view>
+      <view class="upload-text">上传食物照片</view>
+    </view>
+    
+    <!-- 图片预览 -->
+    <view class="image-preview" wx:if="{{hasImage}}">
+      <image src="{{imagePath}}" mode="aspectFill" class="preview-img" />
+      <view class="remove-btn" bindtap="removeImage">✕</view>
+    </view>
+  </view>
+
+  <!-- 健身目标卡片 -->
+  <view class="card">
+    <view class="card-title">健身目标</view>
+    <view class="goal-group">
+      <view
+        wx:for="{{goals}}" wx:key="value"
+        class="goal-item {{fitnessGoal === item.value ? 'active' : ''}}"
+        bindtap="onGoalTap"
+        data-value="{{item.value}}"
+      >
+        {{item.label}}
+      </view>
+    </view>
+  </view>
+
+  <!-- 提交按钮 -->
+  <button
+    class="btn-primary submit-btn"
+    bindtap="onSubmit"
+    loading="{{loading}}"
+    disabled="{{loading}}"
+  >
+    {{loading ? 'Agent 思考中...' : '生成食谱 🚀'}}
+  </button>
+</view>

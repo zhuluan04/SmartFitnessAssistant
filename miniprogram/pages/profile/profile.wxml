@@ -1,0 +1,43 @@
+<!--pages/profile/profile.wxml - 我的页-->
+<view class="page-container">
+  <!-- 用户头像区 -->
+  <view class="profile-header">
+    <view class="avatar-circle">👤</view>
+    <view class="user-name">健身达人</view>
+    <view class="text-secondary">记录你的健康饮食之旅</view>
+  </view>
+
+  <!-- 健身目标设置 -->
+  <view class="card">
+    <view class="card-title">我的健身目标</view>
+    <view class="goal-group">
+      <view
+        wx:for="{{goals}}" wx:key="value"
+        class="goal-item {{currentGoal === item.value ? 'active' : ''}}"
+        bindtap="onGoalTap"
+        data-value="{{item.value}}"
+      >
+        {{item.icon}} {{item.label}}
+      </view>
+    </view>
+  </view>
+
+  <!-- 功能列表 -->
+  <view class="card menu-card">
+    <view class="menu-item" bindtap="goHistory">
+      <text class="menu-icon">📋</text>
+      <text class="menu-text">历史记录</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="goSettings">
+      <text class="menu-icon">⚙️</text>
+      <text class="menu-text">设置</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="goAbout">
+      <text class="menu-icon">ℹ️</text>
+      <text class="menu-text">关于</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+</view>

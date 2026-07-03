@@ -1,0 +1,57 @@
+<!--pages/recommend/recommend.wxml - 推荐页-->
+<view class="page-container">
+  <view class="page-title">🍽️ 精选食谱</view>
+
+  <!-- 目标筛选 -->
+  <view class="filter-bar">
+    <view
+      wx:for="{{goals}}" wx:key="value"
+      class="filter-item {{currentGoal === item.value ? 'active' : ''}}"
+      bindtap="onFilterTap"
+      data-value="{{item.value}}"
+    >
+      {{item.label}}
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-tip" wx:if="{{loading}}">
+    加载中...
+  </view>
+
+  <!-- 食谱卡片列表 -->
+  <view class="card recipe-card" wx:for="{{recipes}}" wx:key="id">
+    <view class="recipe-header">
+      <view class="recipe-name">{{item.name}}</view>
+      <view class="recipe-cal">{{item.calories}}</view>
+    </view>
+    
+    <view class="recipe-tags">
+      <view class="tag" wx:for="{{item.tags}}" wx:key="*this" wx:for-item="tag">{{tag}}</view>
+    </view>
+    
+    <view class="recipe-desc">{{item.description}}</view>
+    
+    <view class="recipe-scores">
+      <view class="score-item">
+        <text class="score-label">营养</text>
+        <view class="score-bar">
+          <view class="score-fill" style="width: {{item.nutrition_score * 10}}%"></view>
+        </view>
+        <text class="score-val">{{item.nutrition_score}}</text>
+      </view>
+      <view class="score-item">
+        <text class="score-label">难度</text>
+        <view class="score-bar">
+          <view class="score-fill difficulty" style="width: {{item.difficulty_score * 10}}%"></view>
+        </view>
+        <text class="score-val">{{item.difficulty_score}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-tip" wx:if="{{recipes.length === 0 && !loading}}">
+    暂无该目标的推荐食谱
+  </view>
+</view>

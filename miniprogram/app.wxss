@@ -1,0 +1,67 @@
+/* app.wxss - 全局清新风格样式 */
+
+page {
+  background-color: #F0FFF9;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  color: #2D3436;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+/* 通用卡片 */
+.card {
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin: 24rpx;
+  box-shadow: 0 4rpx 20rpx rgba(78, 205, 196, 0.08);
+}
+
+/* 主按钮 */
+.btn-primary {
+  background: linear-gradient(135deg, #4ECDC4, #2BA89C);
+  color: #FFFFFF;
+  border-radius: 48rpx;
+  padding: 24rpx 0;
+  font-size: 32rpx;
+  font-weight: 600;
+  text-align: center;
+  border: none;
+}
+
+.btn-primary[disabled] {
+  opacity: 0.6;
+}
+
+/* 标签 */
+.tag {
+  display: inline-block;
+  background: #E8F5F0;
+  color: #2BA89C;
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 16rpx;
+  margin-right: 12rpx;
+}
+
+/* 页面标题 */
+.page-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #2D3436;
+  padding: 32rpx 24rpx 16rpx;
+}
+
+/* 辅助文字 */
+.text-secondary {
+  font-size: 24rpx;
+  color: #636E72;
+}
+
+/* 卡片标题 */
+.card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2D3436;
+  margin-bottom: 20rpx;
+}

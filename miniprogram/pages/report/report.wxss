@@ -1,0 +1,41 @@
+/* pages/report/report.wxss - 报告页样式 */
+
+.page-container {
+  padding-bottom: 40rpx;
+}
+
+/* 耗时信息栏 */
+.meta-bar {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx 32rpx;
+  font-size: 26rpx;
+  color: #636E72;
+}
+
+.meta-icon {
+  font-size: 28rpx;
+}
+
+/* 报告内容 */
+.report-card {
+  min-height: 400rpx;
+}
+
+/* 操作按钮组 */
+.action-group {
+  padding: 24rpx;
+}
+
+.btn-secondary {
+  background: #FFFFFF;
+  color: #4ECDC4;
+  border: 2rpx solid #4ECDC4;
+  border-radius: 48rpx;
+  padding: 24rpx 0;
+  font-size: 32rpx;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 20rpx;
+}

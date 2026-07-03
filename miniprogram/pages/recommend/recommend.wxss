@@ -1,0 +1,124 @@
+/* pages/recommend/recommend.wxss - 推荐页样式 */
+
+.page-container {
+  padding-bottom: 40rpx;
+}
+
+/* 筛选栏 */
+.filter-bar {
+  display: flex;
+  gap: 16rpx;
+  padding: 0 24rpx 16rpx;
+}
+
+.filter-item {
+  padding: 12rpx 32rpx;
+  border-radius: 32rpx;
+  font-size: 26rpx;
+  background: #FFFFFF;
+  color: #636E72;
+  border: 2rpx solid #E8F5F0;
+}
+
+.filter-item.active {
+  background: #4ECDC4;
+  color: #FFFFFF;
+  border-color: #4ECDC4;
+}
+
+/* 加载提示 */
+.loading-tip {
+  text-align: center;
+  color: #636E72;
+  padding: 40rpx 0;
+  font-size: 28rpx;
+}
+
+/* 食谱卡片 */
+.recipe-card {
+  margin-bottom: 0;
+}
+
+.recipe-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.recipe-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2D3436;
+}
+
+.recipe-cal {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #4ECDC4;
+}
+
+.recipe-tags {
+  margin-bottom: 16rpx;
+}
+
+.recipe-desc {
+  font-size: 26rpx;
+  color: #636E72;
+  line-height: 1.6;
+  margin-bottom: 20rpx;
+}
+
+/* 评分条 */
+.recipe-scores {
+  display: flex;
+  gap: 32rpx;
+}
+
+.score-item {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: 1;
+}
+
+.score-label {
+  font-size: 22rpx;
+  color: #636E72;
+  width: 60rpx;
+}
+
+.score-bar {
+  flex: 1;
+  height: 12rpx;
+  background: #E8F5F0;
+  border-radius: 6rpx;
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  background: #4ECDC4;
+  border-radius: 6rpx;
+  transition: width 0.3s;
+}
+
+.score-fill.difficulty {
+  background: #FDCB6E;
+}
+
+.score-val {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #2D3436;
+  width: 36rpx;
+  text-align: right;
+}
+
+/* 空状态 */
+.empty-tip {
+  text-align: center;
+  color: #636E72;
+  padding: 80rpx 0;
+  font-size: 28rpx;
+}
