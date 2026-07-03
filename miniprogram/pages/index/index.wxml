@@ -1,6 +1,6 @@
 <!--pages/index/index.wxml - 首页-->
 <view class="page-container">
-  <view class="page-title">🥗 智能食谱分析</view>
+  <view class="page-title">智能食谱分析</view>
   <view class="text-secondary" style="padding: 0 24rpx 24rpx;">
     输入食材或拍照识别，获取专属健身食谱
   </view>
@@ -51,6 +51,6 @@
     loading="{{loading}}"
     disabled="{{loading}}"
   >
-    {{loading ? 'Agent 思考中...' : '生成食谱 🚀'}}
+    {{loading ? 'Agent 思考中...' : '进行分析'}}
   </button>
 </view>

@@ -1,6 +1,6 @@
 <!--pages/recommend/recommend.wxml - 推荐页-->
 <view class="page-container">
-  <view class="page-title">🍽️ 精选食谱</view>
+  <view class="page-title">精选食谱</view>
 
   <!-- 目标筛选 -->
   <view class="filter-bar">

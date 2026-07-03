@@ -7,9 +7,9 @@ Page({
     currentGoal: '减脂',
     loading: false,
     goals: [
-      { label: '🔥 减脂', value: '减脂' },
-      { label: '💪 增肌', value: '增肌' },
-      { label: '⚖️ 全部', value: '维持' }
+      { label: '减脂', value: '减脂' },
+      { label: '增肌', value: '增肌' },
+      { label: '全部', value: '维持' }
     ]
   },
 

@@ -3,9 +3,9 @@ Page({
   data: {
     currentGoal: '减脂',
     goals: [
-      { icon: '🔥', label: '减脂', value: '减脂' },
-      { icon: '💪', label: '增肌', value: '增肌' },
-      { icon: '⚖️', label: '维持', value: '维持' }
+      { label: '减脂', value: '减脂' },
+      { label: '增肌', value: '增肌' },
+      { label: '维持', value: '维持' }
     ]
   },
 
