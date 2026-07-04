@@ -2,6 +2,8 @@
 
 .page-container {
   padding-bottom: 40rpx;
+  min-height: 100vh;
+  background: #F0FFF9;
 }
 
 /* 头像区 */
@@ -31,32 +33,62 @@
   margin-bottom: 8rpx;
 }
 
-/* 健身目标选择 */
-.goal-group {
-  display: flex;
-  gap: 16rpx;
+.user-desc {
+  font-size: 26rpx;
+  color: #B2BEC3;
 }
 
-.goal-item {
+/* 统计卡片 */
+.stats-row {
+  display: flex;
+  margin: 0 32rpx 32rpx;
+  padding: 32rpx 16rpx;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(78, 205, 196, 0.08);
+}
+
+.stat-item {
   flex: 1;
   text-align: center;
-  padding: 16rpx 0;
-  border-radius: 32rpx;
-  font-size: 26rpx;
-  background: #F0FFF9;
-  color: #636E72;
-  border: 2rpx solid #E8F5F0;
 }
 
-.goal-item.active {
-  background: #4ECDC4;
-  color: #FFFFFF;
-  border-color: #4ECDC4;
+.stat-num {
+  font-size: 44rpx;
+  font-weight: bold;
+  color: #4ECDC4;
+  line-height: 1;
+  display: block;
 }
 
-/* 功能菜单 */
+.stat-label {
+  font-size: 22rpx;
+  color: #B2BEC3;
+  display: block;
+  margin-top: 8rpx;
+}
+
+.stat-divider {
+  width: 1rpx;
+  height: 50rpx;
+  background: #E8F5F0;
+  align-self: center;
+}
+
+/* 分组标题 */
+.section-title {
+  font-size: 24rpx;
+  color: #B2BEC3;
+  padding: 0 32rpx 16rpx;
+}
+
+/* 功能菜单容器 */
 .menu-card {
-  padding: 0;
+  margin: 0 32rpx 24rpx;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 16rpx rgba(78, 205, 196, 0.08);
 }
 
 .menu-item {

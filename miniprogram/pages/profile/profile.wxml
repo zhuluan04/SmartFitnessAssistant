@@ -1,34 +1,47 @@
 <!--pages/profile/profile.wxml - 我的页-->
 <view class="page-container">
-  <!-- 用户头像区 -->
+  <!-- 用户信息区 -->
   <view class="profile-header">
     <view class="avatar-circle">👤</view>
     <view class="user-name">健身达人</view>
-    <view class="text-secondary">记录你的健康饮食之旅</view>
+    <view class="user-desc">记录你的健康饮食之旅</view>
   </view>
 
-  <!-- 健身目标设置 -->
-  <view class="card">
-    <view class="card-title">我的健身目标</view>
-    <view class="goal-group">
-      <view
-        wx:for="{{goals}}" wx:key="value"
-        class="goal-item {{currentGoal === item.value ? 'active' : ''}}"
-        bindtap="onGoalTap"
-        data-value="{{item.value}}"
-      >
-        {{item.icon}} {{item.label}}
-      </view>
+  <!-- 数据统计卡片 -->
+  <view class="stats-row">
+    <view class="stat-item">
+      <text class="stat-num">{{stats.analyses}}</text>
+      <text class="stat-label">分析次数</text>
+    </view>
+    <view class="stat-divider"></view>
+    <view class="stat-item">
+      <text class="stat-num">{{stats.recipes}}</text>
+      <text class="stat-label">收藏食谱</text>
+    </view>
+    <view class="stat-divider"></view>
+    <view class="stat-item">
+      <text class="stat-num">{{stats.days}}</text>
+      <text class="stat-label">使用天数</text>
     </view>
   </view>
 
   <!-- 功能列表 -->
-  <view class="card menu-card">
+  <view class="section-title">常用功能</view>
+  <view class="menu-card">
     <view class="menu-item" bindtap="goHistory">
       <text class="menu-icon">📋</text>
       <text class="menu-text">历史记录</text>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="goFavorites">
+      <text class="menu-icon">❤️</text>
+      <text class="menu-text">我的收藏</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <view class="section-title">其他</view>
+  <view class="menu-card">
     <view class="menu-item" bindtap="goSettings">
       <text class="menu-icon">⚙️</text>
       <text class="menu-text">设置</text>

@@ -1,29 +1,51 @@
 // pages/profile/profile.js - 我的页
 Page({
   data: {
-    currentGoal: '减脂',
-    goals: [
-      { label: '减脂', value: '减脂' },
-      { label: '增肌', value: '增肌' },
-      { label: '维持', value: '维持' }
-    ]
-  },
-
-  onLoad() {
-    const saved = wx.getStorageSync('fitnessGoal')
-    if (saved) {
-      this.setData({ currentGoal: saved })
+    stats: {
+      analyses: 0,
+      recipes: 0,
+      days: 1
     }
   },
 
-  onGoalTap(e) {
-    const goal = e.currentTarget.dataset.value
-    this.setData({ currentGoal: goal })
-    wx.setStorageSync('fitnessGoal', goal)
-    wx.showToast({ title: `目标已设为${goal}`, icon: 'success' })
+  onLoad() {
+    this.loadStats()
+  },
+
+  onShow() {
+    this.loadStats()
+  },
+
+  loadStats() {
+    // 从本地存储读取统计信息
+    const history = wx.getStorageSync('analysisHistory') || []
+    const favorites = wx.getStorageSync('favorites') || []
+
+    // 计算使用天数（首次使用日期到今天）
+    const firstUse = wx.getStorageSync('firstUseDate')
+    let days = 1
+    if (firstUse) {
+      const first = new Date(firstUse)
+      const now = new Date()
+      days = Math.max(1, Math.ceil((now - first) / (1000 * 60 * 60 * 24)))
+    } else {
+      wx.setStorageSync('firstUseDate', new Date().toISOString())
+    }
+
+    this.setData({
+      stats: {
+        analyses: history.length,
+        recipes: favorites.length,
+        days
+      }
+    })
   },
 
   goHistory() {
+    wx.showToast({ title: '功能开发中', icon: 'none' })
+  },
+
+  goFavorites() {
     wx.showToast({ title: '功能开发中', icon: 'none' })
   },
 
