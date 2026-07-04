@@ -1,9 +1,9 @@
 # 智能健身食谱与卡路里总结 Agent · 开发文档
 
 运行：
-uv run python main.py cli
+uv run python main.py api
 
-版本：v0.2　　日期：2026-07-03　　状态：阶段一开发中（核心代码已就绪，待联调测试）
+版本：v0.3　　日期：2026-07-04　　状态：阶段一（防幻觉加固完成）
 
 ---
 
@@ -24,22 +24,30 @@ uv run python main.py cli
 用户输入（图片/文字）
         │
         ▼
-┌───────────────────────┐
-│   LangChain Agent      │
-│  （create_agent）       │
-│  model: Qwen3.5-Plus    │
-├───────────────────────┤
-│ 工具1：web_search       │  → Tavily：检索候选食谱
-│ 工具2：calculate_       │  → 本地/第三方营养数据库：
-│        food_calories   │     核算卡路里，杜绝幻觉
-└───────────────────────┘
+┌─────────────────────────────────────┐
+│   LangChain Agent                    │
+│  （create_agent）                     │
+│  model: Qwen3.5-Plus                  │
+├─────────────────────────────────────┤
+│ 工具①：web_search                    │  → Tavily：检索候选食谱
+│ 工具②：calculate_food_calories       │  → 本地热量表：精确计算食材卡路里
+│        （仅用于原始食材）             │     返回完整性标记，杜绝编造
+│ 工具③：estimate_meal_calories        │  → 估算成品食物热量
+│        （仅用于成品菜肴）             │     返回"估算值+置信度+误差范围"
+├─────────────────────────────────────┤
+│  防幻觉加固层                         │
+│  · ToolCallTracer 回调处理器          │  → 记录每次工具调用的输入/输出
+│  · invoke_agent_with_trace()          │  → 调用后自动验证热量工具是否被调用
+│  · 轨迹摘要追加至输出末尾              │  → 最终报告热量必须来自工具返回值
+└─────────────────────────────────────┘
         │
         ▼
-   结构化 Markdown 报告
-   （食谱/得分/理由/图片）
+   结构化 Markdown 报告（含工具调用轨迹）
         │
         ▼
 FastAPI（/generate_diet）──► 微信小程序（mp-html 渲染）
+       │
+       └── 响应体新增 tool_trace 字段，前端可校验热量来源
 ```
 
 ---
@@ -109,120 +117,186 @@ web_search = TavilySearch(
 )
 ```
 
-### 4.3 工具二：卡路里计算（阶段一待补齐，核心痛点解决方案）
+### 4.3 工具二：食材卡路里计算（v0.3 防幻觉加固）
 
-> 目的：杜绝大模型对卡路里数值的"幻觉"，强制通过确定性函数或外部数据库核算。
+> 目的：杜绝大模型对卡路里数值的"幻觉"，强制通过确定性函数核算。
+
+**防幻觉设计要点**：
+- 返回值增加了 `包含未收录食材`、`未收录食材列表`、`数据完整性` 三个字段。
+- 未收录食材**不计入总卡路里**，并附带说明"总卡路里不完整"。
+- 最终报告必须直接引用工具的返回值，不允许模型自行估算。
 
 ```python
-from langchain.tools import tool
-
-# 简化版：本地食物热量表（生产环境建议接入第三方营养数据库 API，如薄荷健康/USDA FoodData Central）
-FOOD_CALORIE_TABLE = {
-    "鸡胸肉": 133,   # 每100g，千卡
-    "西兰花": 34,
-    "糙米饭": 116,
-    "鸡蛋": 155,
-    "牛油果": 160,
-    # ... 持续补充
-}
-
-@tool
-def calculate_food_calories(food_items: dict) -> dict:
+@tool(args_schema=FoodItemsInput)
+def calculate_food_calories(food_items: dict[str, float]) -> dict:
     """
-    根据食材及重量（单位：克）计算总卡路里。
-    输入示例：{"鸡胸肉": 150, "西兰花": 100}
-    输出：每种食材的卡路里明细 + 总卡路里
+    仅适用于原始食材。返回含完整性标记的精确热量数据。
     """
     detail = {}
+    unlisted = []
     total = 0
     for name, grams in food_items.items():
         kcal_per_100g = FOOD_CALORIE_TABLE.get(name)
         if kcal_per_100g is None:
             detail[name] = "未收录，需人工核实"
+            unlisted.append(name)
             continue
         kcal = round(kcal_per_100g * grams / 100, 1)
-        detail[name] = f"{kcal} kcal"
+        detail[name] = f"{kcal} kcal（每100g {kcal_per_100g} kcal × {grams}g）"
         total += kcal
-    return {"明细": detail, "总卡路里": f"{round(total, 1)} kcal"}
+
+    result = {
+        "明细": detail,
+        "已收录食材总卡路里": f"{round(total, 1)} kcal",
+        "包含未收录食材": len(unlisted) > 0,
+        "未收录食材列表": unlisted,
+        "数据完整性": "完整" if not unlisted else "不完整",
+    }
+    if unlisted:
+        result["说明"] = f"以下食材未收录：{'、'.join(unlisted)}。总卡路里不完整。"
+    return result
 ```
 
-**后续优化方向**：本地表覆盖有限，建议阶段二接入第三方营养数据库 API（如薄荷健康开放接口、USDA FoodData Central），或维护一份更完整的食材热量 CSV，通过 RAG 检索匹配。
+### 4.4 工具三：成品食物估算（v0.3 新增，防成品伪装精确值）
 
-### 4.4 System Prompt（补充强制输出格式）
+> 目的：成品食物无法精确计算，强制通过此工具返回"估算值 + 置信度 + 误差范围"，
+> 杜绝模型伪装成精确值。
 
 ```python
-system_prompt = """
-你是一名私人厨师兼营养师。收到用户提供的食材照片或清单后，请严格按以下流程操作：
-
-1. 识别和评估食材：若用户提供照片，首先辨识所有可见食材，基于外观状态评估新鲜度与可用量，
-   整理出"当前可用食材清单"（含预估重量，单位：克）。
-
-2. 智能食谱检索：必须调用 web_search 工具，以"可用食材清单 + 健身目标（减脂/增肌）"为核心关键词，
-   查找可行菜谱。严禁在未调用工具的情况下凭空编造菜谱。
-
-3. 精准卡路里核算：对筛选出的候选食谱，必须调用 calculate_food_calories 工具计算总卡路里，
-   严禁自行估算或编造数值。
-
-4. 多维度评估与排序：从"营养价值"和"制作难度"两个维度对候选食谱进行 1-10 分打分，
-   优先推荐简单且营养丰富的食谱。
-
-5. 结构化输出：严格按以下 Markdown 表格格式输出，不要额外发挥格式：
-
-   | 排名 | 食谱名称 | 总卡路里 | 营养得分 | 难度得分 | 推荐理由 |
-   |---|---|---|---|---|---|
-   | 1 | ... | ... | ... | ... | ... |
-
-   表格下方附上每道菜的一句话做法概述。
-
-请严格按流程执行：先调用 web_search 搜索食谱，再调用 calculate_food_calories 核算热量，
-两个工具缺一不可；搜索/计算失败时明确告知用户，而不是自行编造结果。
-"""
+@tool(args_schema=MealEstimateInput)
+def estimate_meal_calories(
+    meal_name: str,
+    estimated_weight_g: float = 200,
+    main_ingredients: list[str] = [],
+) -> dict:
+    """
+    估算成品食物卡路里。
+    返回值包含估算卡路里、置信度（高/中/低）、误差范围（±kcal）、估算依据。
+    声明：此为估算值，不作为精确营养数据。
+    """
+    # ... 基于食材热量表或营养学通用估算 ...
+    return {
+        "食物名称": meal_name,
+        "估计份量": f"{estimated_weight_g}g",
+        "估算卡路里": f"{total_est} kcal",
+        "置信度": confidence,       # "高" / "中" / "低"
+        "误差范围": f"±{error_range} kcal",
+        "估算依据": estimate_basis,
+        "声明": "⚠️ 此为估算值，仅作参考。"
+    }
 ```
 
-### 4.5 Agent 组装
+### 4.5 ToolCallTracer：工具调用轨迹记录器（v0.3 新增，核心防幻觉设施）
+
+> 通过 LangChain 的 `BaseCallbackHandler` 机制，在 Agent 运行过程中实时记录
+> 每个工具的调用时间、输入参数、返回结果。CLI 和 API 调用结束后自动展示轨迹。
+
+```python
+class ToolCallTracer(BaseCallbackHandler):
+    def on_tool_start(self, serialized, input_str, **kwargs):
+        # 记录工具名称和输入
+    def on_tool_end(self, output, **kwargs):
+        # 记录工具输出
+    def get_summary(self) -> str:
+        # 生成人类可读的轨迹摘要
+```
+
+**关键作用**：
+- 每次 Agent 调用后，验证 `calculate_food_calories` 或 `estimate_meal_calories` 是否被调用。
+- 若未调用热量工具，CLI 显示红色警告，API 在响应中标注 `tool_trace` 字段。
+- 最终用户可肉眼验证报告中的热量数值与工具返回值一致。
+
+### 4.6 System Prompt（防幻觉版 v0.3）
+
+**核心强化规则**（仅摘要，完整版见 `app/langchain.py`）：
+
+```text
+## 情况A：如果是【食材】
+3. 精准卡路里核算：
+   - 必须调用 calculate_food_calories 工具。
+   - 🔴 最终报告"总卡路里"须直接取自工具返回值。
+   - 若工具返回"包含未收录食材: true"，标记"⚠️ 总热量不完整"。
+   - 工具未返回数值时输出"❌ 热量计算失败"。
+
+## 情况B：如果是【成品食物】
+2. 估算热量：
+   - 必须调用 estimate_meal_calories 工具。
+   - 🔴 输出格式为"估算值 ± 误差范围"，标注置信度。
+   - 禁止输出不含误差范围的精确值。
+   示例：约 350 ± 88 kcal（置信度：中）
+
+## 第三步：附上工具调用轨迹
+在报告末尾输出工具调用摘要：
+---
+**工具调用轨迹**
+1. ✅ web_search — 搜索了关键词：[...]
+2. ✅ calculate_food_calories — 返回：已收录 xxx kcal
+---
+```
+
+### 4.7 Agent 组装（v0.3 更新）
 
 ```python
 from langchain.agents import create_agent
 
-agent = create_agent(
-    model=model,
-    tools=[web_search, calculate_food_calories],
+_common_tools = [web_search, calculate_food_calories, estimate_meal_calories]
+
+text_agent = create_agent(
+    model=text_model,
+    tools=_common_tools,
     system_prompt=system_prompt,
 )
 
-# 调用示例
-result = agent.invoke({
-    "messages": [{"role": "user", "content": "我有鸡胸肉150g、西兰花100g、糙米饭一碗，目标是减脂，帮我推荐食谱"}]
-})
-print(result["messages"][-1].content)
+vision_agent = create_agent(
+    model=vision_model,
+    tools=_common_tools,
+    system_prompt=system_prompt,
+)
+
+# 带轨迹记录的封装调用
+def invoke_agent_with_trace(agent, message_content):
+    tracer = get_tracer()
+    tracer.clear()
+    result = agent.invoke(
+        {"messages": [{"role": "user", "content": message_content}]},
+        config={"callbacks": [tracer]},
+    )
+    return result["messages"][-1].content, tracer.get_trace()
 ```
 
 ---
 
 ## 五、阶段性开发计划
 
-### 阶段一：单机版 Agent 跑通 ✅ 已完成
+### 阶段一：单机版 Agent 跑通 ✅ 已完成（v0.3 防幻觉加固）
 
 - [x] 本地环境搭建、`.env` 配置（DashScope + Tavily 两套 key）
 - [x] 编写 `calculate_food_calories` 工具（本地热量表 + Pydantic schema）
-- [x] 补全 System Prompt 的输出格式约束（食物状态判断 + Markdown 表格模板）
-- [x] CLI 交互入口（`uv run python main.py cli`）
-- [x] 文本模型（qwen3.5-plus）+ 视觉模型（qwen-vl-plus）双 Agent 架构
+- [x] **v0.3** 改造返回值，增加 `包含未收录食材`/`未收录食材列表`/`数据完整性` 字段
+- [x] **v0.3** 新增 `estimate_meal_calories` 成品食物估算工具（返回"估算值+置信度+误差范围"）
+- [x] **v0.3** 新增 `ToolCallTracer` 回调处理器，记录每次工具调用的输入/输出
+- [x] **v0.3** 新增 `invoke_agent_with_trace()` 封装，自动验证热量工具是否被调用
+- [x] **v0.3** 重写 System Prompt，强制热量数值必须来自工具返回值
+- [x] **v0.3** 更新 API 响应体 `DietResponse`，新增 `tool_trace` 字段
 - [ ] 单元测试：`calculate_food_calories`（覆盖正常计算 + "食材未收录"分支）
+- [x] CLI 交互入口（`uv run python main.py cli`）
 - [x] 终端纯文本验证："输入食材 → 搜索食谱 → 计算卡路里 → 输出表格"完整闭环
-- [ ] 验证点：抓日志确认模型**确实调用了两个工具**，而非直接生成答案
+- [x] **v0.3** CLI 结束后显示工具调用轨迹摘要，并验证热量工具是否被调用
 
 ### 阶段二：多模态与调试优化 ✅ 大部分完成
 
 - [x] 接入图片输入（使用 qwen-vl-plus 视觉模型，CLI 已支持图片路径）
-- [ ] 接入 LangSmith 全链路追踪，观察 Thought/Action，优化提示词
+- [x] **v0.3** 内置 ToolCallTracer 替代 LangSmith，低开销实时记录工具调用
+- [ ] 接入 LangSmith 全链路追踪，观察 Thought/Action，优化提示词（可选）
 - [ ] 补充/接入第三方营养数据库，扩大食材覆盖率（当前本地热量表过渡）
 
-### 阶段三：后端 API 封装 ✅ 已完成
+### 阶段三：后端 API 封装 ✅ 已完成（v0.3 更新）
 
 - [x] FastAPI 封装（`app/api.py`）
   - [x] `GET /api/health` — 健康检查
   - [x] `POST /api/generate_diet` — 食谱生成（text/image 双模式）
+    - [x] **v0.3** 响应体新增 `tool_trace` 字段
+    - [x] **v0.3** 未调用热量工具时自动追加警告到报告
   - [x] `GET /api/recommend` — 精选推荐食谱（按健身目标筛选）
 - [x] CORS 中间件（支持小程序跨域请求）
 - [x] Pydantic 请求/响应模型
@@ -251,14 +325,24 @@ print(result["messages"][-1].content)
 3. **卡路里数据来源**：本地表仅作为过渡方案，生产环境务必接入权威营养数据库，避免长期维护自建表。
 4. **输出格式稳定性**：System Prompt 中固定 Markdown 表格模板，减少小程序端解析的不确定性。
 5. **前后端职责边界**：小程序仅做展示壳，卡路里计算与搜索逻辑全部留在 Python 后端。
+6. **🔴 防卡路里幻觉三重保障（v0.3 新增）**：
+   - **第一重：工具返回值完整性标记** — `calculate_food_calories` 返回 `包含未收录食材`/`未收录食材列表`/`数据完整性`，未收录食材不计入总热量。
+   - **第二重：ToolCallTracer 轨迹记录** — LangChain 回调处理器实时记录每个工具的输入输出，
+     调用结束后自动验证热量工具是否被调用。
+   - **第三重：System Prompt 硬约束** — 强制要求热量数值必须来自工具返回值，禁止模型自行估算。
+     成品食物只允许输出"估算值 + 置信度 + 误差范围"。
 
 ---
 
-## 七、验收标准（阶段一）
+## 七、验收标准（阶段一 v0.3 防幻觉版）
 
 | 测试项 | 通过标准 |
 |---|---|
 | 纯文本输入食材清单 | Agent 依次调用 web_search → calculate_food_calories，输出符合模板的表格 |
-| 食材未收录热量表 | 工具返回"未收录，需人工核实"，Agent 不编造数值 |
+| 食材未收录热量表 | 工具返回"未收录食材列表"，总热量标记"不完整"，Agent 不编造数值 |
 | 搜索无结果 | Agent 明确告知用户搜索失败，而非自行编造菜谱 |
 | 重复调用一致性 | 相同输入连续跑 3 次，工具调用链路稳定（均调用了两个工具） |
+| **工具调用轨迹验证** | CLI 输出末尾显示工具调用摘要，确认热量工具已调用 |
+| **成品食物输入** | Agent 调用 estimate_meal_calories，输出含置信度和误差范围，不伪装精确值 |
+| **未收录食材不计入总热量** | 热量表中没有的食材不累加，总卡路里旁标注"⚠️ 总热量不完整" |
+| **API 返回 tool_trace** | `POST /api/generate_diet` 响应中包含 `tool_trace` 字段 |

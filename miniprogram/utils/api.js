@@ -38,22 +38,26 @@ function request(options) {
 /**
  * 分阶段 loading 提示
  */
-let loadingTimer = null
+let loadingTimer1 = null
+let loadingTimer2 = null
 
 function startLoading(initialText = 'Agent 思考中...') {
   wx.showLoading({ title: initialText, mask: true })
-  
-  loadingTimer = setTimeout(() => {
+
+  loadingTimer1 = setTimeout(() => {
     wx.showLoading({ title: '正在搜索食谱...', mask: true })
   }, 15000)
-  
-  setTimeout(() => {
+
+  loadingTimer2 = setTimeout(() => {
     wx.showLoading({ title: '分析较慢，仍在处理...', mask: true })
   }, 30000)
 }
 
 function stopLoading() {
-  clearTimeout(loadingTimer)
+  clearTimeout(loadingTimer1)
+  clearTimeout(loadingTimer2)
+  loadingTimer1 = null
+  loadingTimer2 = null
   wx.hideLoading()
 }
 
