@@ -1,0 +1,22 @@
+# 密钥（绝不能进入镜像）
+.env
+
+# 虚拟环境与缓存
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Git 与 IDE
+.git/
+.idea/
+.vscode/
+
+# 文档与测试临时文件
+*.md
+test_food.png
+test_food.jpg
+
+# 微信小程序（后端镜像不需要）
+miniprogram/node_modules/
+miniprogram/miniprogram_npm/

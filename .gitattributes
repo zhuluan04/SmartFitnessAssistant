@@ -1,0 +1,6 @@
+# 换行符统一规范：容器与 CI 相关文件强制 LF，避免跨平台构建问题
+* text=auto
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
