@@ -9,12 +9,14 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 docker -v
 
-echo "[2/5] 拉取代码..."
-if [ ! -d SmartFitnessAssistant ]; then
-    git clone https://github.com/zhuluan04/SmartFitnessAssistant.git
+echo "[2/5] 定位仓库目录..."
+if [ ! -f pyproject.toml ]; then
+    if [ ! -d SmartFitnessAssistant ]; then
+        git clone https://github.com/zhuluan04/SmartFitnessAssistant.git
+    fi
+    cd SmartFitnessAssistant
 fi
-cd SmartFitnessAssistant
-git pull --ff-only
+git pull --ff-only || echo "（拉取失败，继续使用本地代码）"
 
 echo "[3/5] 配置密钥..."
 if [ ! -f .env ]; then
