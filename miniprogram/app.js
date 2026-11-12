@@ -1,8 +1,10 @@
 // app.js - 全局配置
 App({
   globalData: {
-    // 开发环境地址，上线后替换为正式域名
-    apiBaseUrl: 'http://localhost:8000',
+    // 正式环境地址
+    apiBaseUrl: 'https://qingjianshen.cn',
+    // 与后端 .env 中 API_AUTH_TOKEN 保持一致
+    apiToken: 'c6b8156a953e42b9a374f18ee8c5ab6e',
     // 请求超时（毫秒），Agent 处理较慢
     requestTimeout: 60000
   },

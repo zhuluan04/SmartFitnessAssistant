@@ -3,14 +3,32 @@ services:
     build: .
     container_name: fitness-app
     env_file: .env
+    environment:
+      # 容器内通过服务名连接 MySQL（覆盖 .env 中的 127.0.0.1）
+      - DB_HOST=mysql
     restart: unless-stopped
     expose:
       - "8000"
+    depends_on:
+      - mysql
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
+
+  mysql:
+    image: mysql:8.0
+    container_name: fitness-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root123456}
+      MYSQL_DATABASE: fitness_db
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    expose:
+      - "3306"
 
   caddy:
     image: caddy:2-alpine
@@ -29,3 +47,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  mysql_data:

@@ -478,16 +478,20 @@ vision_agent = create_agent(
 )
 
 
-def invoke_agent_with_trace(agent, message_content):
+def invoke_agent_with_trace(agent, message_content, extra_callbacks: list | None = None):
     """
     带轨迹记录的封装调用。
+    extra_callbacks：额外的回调处理器（如任务进度推送）。
     返回 (report_content, tool_trace_list)
     """
     tracer = get_tracer()
     tracer.clear()
+    callbacks = [tracer]
+    if extra_callbacks:
+        callbacks += extra_callbacks
     result = agent.invoke(
         {"messages": [{"role": "user", "content": message_content}]},
-        config={"callbacks": [tracer]},
+        config={"callbacks": callbacks},
     )
     return result["messages"][-1].content, tracer.get_trace()
 

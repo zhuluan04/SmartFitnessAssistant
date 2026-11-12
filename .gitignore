@@ -28,3 +28,7 @@ Thumbs.db
 miniprogram/node_modules/
 miniprogram/miniprogram_npm/
 miniprogram/.DS_Store
+
+# 微信开发者工具私有配置（每次打开可能自动变化，不入库）
+project.private.config.json
+miniprogram/project.private.config.json

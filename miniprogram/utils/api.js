@@ -19,6 +19,7 @@ function request(options) {
       timeout: options.timeout || app.globalData.requestTimeout,
       header: {
         'Content-Type': 'application/json',
+        'X-API-Token': app.globalData.apiToken,
         ...options.header
       },
       success: (res) => {
