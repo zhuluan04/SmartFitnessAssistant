@@ -116,29 +116,8 @@ vision_model = init_chat_model(
     temperature=0.3,
 )
 
-# 7. 卡路里计算工具（本地热量表，阶段一过渡方案）
-FOOD_CALORIE_TABLE = {
-    "鸡胸肉": 133,   # 每100g，千卡
-    "西兰花": 34,
-    "糙米饭": 116,
-    "鸡蛋": 155,
-    "牛油果": 160,
-    "三文鱼": 208,
-    "牛肉": 250,
-    "土豆": 81,
-    "番茄": 18,
-    "黄瓜": 16,
-    "胡萝卜": 41,
-    "菠菜": 23,
-    "豆腐": 76,
-    "牛奶": 66,
-    "燕麦": 377,
-    "红薯": 86,
-    "虾仁": 99,
-    "米饭": 116,
-    "面条": 280,
-    # TODO: 阶段二接入第三方营养数据库 API（薄荷健康 / USDA FoodData Central）
-}
+# 7. 卡路里计算工具（本地热量表 + USDA 兜底，见 app/tools/nutrition.py）
+from app.tools.nutrition import FOOD_CALORIE_TABLE, lookup_calorie
 
 # ═══════════════════════════════════════════════════════════
 # 【新增】食材名称标准化（解决别名匹配脆弱问题）
@@ -264,9 +243,9 @@ def calculate_food_calories(food_items: dict[str, float]) -> dict:
         # 步骤 1：名称标准化（别名 → 标准名）
         standard_name, is_exact = normalize_food_name(raw_name)
 
-        # 步骤 2：查询热量表
-        kcal_per_100g = FOOD_CALORIE_TABLE.get(standard_name)
-        if kcal_per_100g is None:
+        # 步骤 2：查询热量（本地表优先，USDA 兜底）
+        lookup = lookup_calorie(standard_name)
+        if lookup is None:
             # 未命中
             unknown_items.append({
                 "name": raw_name,
@@ -276,6 +255,9 @@ def calculate_food_calories(food_items: dict[str, float]) -> dict:
             })
             logger.info(f"⚠️ 食材'{raw_name}'（标准化后：'{standard_name}'）未在热量表中收录")
             continue
+
+        kcal_per_100g = lookup["kcal_per_100g"]
+        source = lookup["source"]
 
         # 记录映射关系
         if standard_name != raw_name:
@@ -291,7 +273,7 @@ def calculate_food_calories(food_items: dict[str, float]) -> dict:
             "grams": grams,
             "kcal_per_100g": kcal_per_100g,
             "kcal": kcal,
-            "source": "local_table",
+            "source": source,
             "matched": True,
         })
 
@@ -337,14 +319,14 @@ def estimate_meal_calories(
     - 适用于无法拆解为原始食材重量时使用。
     - 返回值包含置信度和误差范围，仅供参考。
     """
-    # 查找已知原料的热量信息辅助估算
+    # 查找已知原料的热量信息辅助估算（本地表 + USDA 兜底）
     known_kcal_sum = 0
     unknown_ingredients = []
 
     for ing in main_ingredients:
-        kcal_per_100g = FOOD_CALORIE_TABLE.get(ing)
-        if kcal_per_100g is not None:
-            known_kcal_sum += kcal_per_100g
+        lookup = lookup_calorie(ing)
+        if lookup is not None:
+            known_kcal_sum += lookup["kcal_per_100g"]
         else:
             unknown_ingredients.append(ing)
 
