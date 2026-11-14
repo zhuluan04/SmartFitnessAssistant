@@ -48,9 +48,20 @@
   <button
     class="btn-primary submit-btn"
     bindtap="onSubmit"
-    loading="{{loading}}"
     disabled="{{loading}}"
   >
-    {{loading ? 'Agent 思考中...' : '进行分析'}}
+    {{loading ? '分析中...' : '进行分析'}}
   </button>
+</view>
+
+<!-- 分析中遮罩：阶段文案 + 进度条，替代不可定制的 wx.showLoading -->
+<view class="loading-mask" wx:if="{{loading}}">
+  <view class="loading-card">
+    <view class="spinner"></view>
+    <view class="loading-stage">{{stageText}}</view>
+    <view class="progress-track">
+      <view class="progress-bar" style="width: {{progressPercent}}%"></view>
+    </view>
+    <view class="loading-hint">已用 {{elapsedSec}}s · 预计还需 {{etaSec}}s</view>
+  </view>
 </view>

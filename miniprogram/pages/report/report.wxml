@@ -1,14 +1,76 @@
 <!--pages/report/report.wxml - 报告页-->
 <view class="page-container">
-  <!-- 耗时信息 -->
-  <view class="meta-bar card">
-    <text class="meta-icon">⏱️</text>
-    <text>分析耗时 {{elapsed}} 秒</text>
+
+  <!-- 总热量主视觉 -->
+  <view class="hero-card" wx:if="{{reportData}}">
+    <view class="hero-label">本次食材总热量</view>
+    <view class="hero-value">
+      {{reportData.total_calories || '--'}}<text class="hero-unit">kcal</text>
+    </view>
+    <view class="hero-basis" wx:if="{{reportData.basis}}">{{reportData.basis}}</view>
   </view>
 
-  <!-- Markdown 报告 -->
-  <view class="card report-card">
-    <mp-html content="{{reportHtml}}" />
+  <!-- 异常提示（热量不完整 / 工具未调用） -->
+  <view class="warn-bar" wx:if="{{reportData && reportData.warning}}">⚠️ {{reportData.warning}}</view>
+
+  <!-- 食材明细 -->
+  <view class="card" wx:if="{{reportData && reportData.items.length}}">
+    <view class="card-title">食材明细</view>
+    <view class="item-row" wx:for="{{reportData.items}}" wx:key="name">
+      <text class="item-name">{{item.name}}</text>
+      <text class="item-grams">
+        {{item.grams}}g<text class="tag-est" wx:if="{{item.estimated}}">估计</text>
+      </text>
+      <text class="item-kcal">{{item.kcal}} kcal</text>
+    </view>
+  </view>
+
+  <!-- 食谱卡片 -->
+  <view class="recipe-card" wx:for="{{reportData.recipes}}" wx:key="name">
+    <view class="recipe-head">
+      <view class="recipe-idx">{{index + 1}}</view>
+      <text class="recipe-name">{{item.name}}</text>
+    </view>
+
+    <view class="recipe-meta">
+      <text class="recipe-cal">{{item.calories || '--'}}<text class="unit">kcal</text></text>
+      <text class="recipe-protein" wx:if="{{item.protein_hint}}">蛋白 {{item.protein_hint}}</text>
+    </view>
+
+    <view class="recipe-reason" wx:if="{{item.reason}}">{{item.reason}}</view>
+
+    <view class="steps" wx:if="{{item.steps.length}}">
+      <view class="step" wx:for="{{item.steps}}" wx:for-item="step" wx:for-index="si" wx:key="*this">
+        <text class="step-dot">{{si + 1}}</text>
+        <text class="step-text">{{step}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态：模型未返回可用食谱 -->
+  <view class="card empty-card" wx:if="{{reportData && !reportData.recipes.length}}">
+    <text class="empty-text">未能生成有效食谱，请点击下方按钮重新分析。</text>
+  </view>
+
+  <!-- 营养小贴士 -->
+  <view class="card" wx:if="{{reportData && reportData.tips.length}}">
+    <view class="card-title">营养小贴士</view>
+    <view class="tip" wx:for="{{reportData.tips}}" wx:key="*this">💡 {{item}}</view>
+  </view>
+
+  <!-- 兜底：结构化解析失败时展示原文（不用 mp-html，<text> 会保留换行） -->
+  <view class="card" wx:if="{{!reportData}}">
+    <view class="card-title">分析结果</view>
+    <text class="raw-text" user-select>{{rawReport}}</text>
+  </view>
+
+  <!-- 调试信息：默认折叠 -->
+  <view class="debug-toggle" bindtap="toggleDebug">
+    调试信息（耗时 {{elapsed}}s）{{showDebug ? '▲' : '▼'}}
+  </view>
+  <view class="debug-panel" wx:if="{{showDebug}}">
+    <view class="debug-line" wx:for="{{trace}}" wx:key="index">· {{item.tool}} — {{item.status}}</view>
+    <view class="debug-line" wx:if="{{!trace.length}}">· 无工具调用记录</view>
   </view>
 
   <!-- 操作按钮 -->

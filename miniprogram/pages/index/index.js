@@ -1,9 +1,18 @@
 // pages/index/index.js - 首页
 const { request } = require('../../utils/api')
 
-// 轮询间隔 2 秒，最多 90 次（共 3 分钟）
-const POLL_INTERVAL = 2000
-const POLL_MAX_ATTEMPTS = 90
+// 轮询间隔 800ms：成功后最多延迟不到 1 秒即可跳转（原 2000ms 白等 2 秒）
+const POLL_INTERVAL = 800
+const POLL_MAX_ATTEMPTS = 225
+
+// 后端真实进度 → 前端文案与进度条
+const DEFAULT_STAGE = { text: '正在理解你的食材...', percent: 12 }
+const STAGE_MAP = {
+  '识别中': { text: '正在识别食材...', percent: 30 },
+  '搜索中': { text: '正在检索食材信息...', percent: 45 },
+  '计算中': { text: '正在核算卡路里...', percent: 65 },
+  '生成报告中': { text: '正在生成专属报告...', percent: 88 }
+}
 
 Page({
   data: {
@@ -13,6 +22,10 @@ Page({
     hasImage: false,
     fitnessGoal: '减脂',
     loading: false,
+    stageText: DEFAULT_STAGE.text,
+    progressPercent: DEFAULT_STAGE.percent,
+    elapsedSec: 0,
+    etaSec: 12,
     goals: [
       { label: '减脂', value: '减脂' },
       { label: '增肌', value: '增肌' },
@@ -80,8 +93,9 @@ Page({
       return
     }
 
+    this._setStage(DEFAULT_STAGE)
+    this._startTicker()
     this.setData({ loading: true })
-    wx.showLoading({ title: '任务创建中...', mask: true })
 
     request({
       url: '/api/generate_diet/task',
@@ -110,18 +124,20 @@ Page({
         method: 'GET'
       }).then((res) => {
         if (res.status === 'success') {
-          wx.hideLoading()
+          this._stopTicker()
           this.setData({ loading: false })
-          wx.setStorageSync('currentReport', res.report)
+          wx.setStorageSync('currentReportData', res.report_data || null)
+          wx.setStorageSync('currentReport', res.report || '')
+          wx.setStorageSync('currentTrace', res.tool_trace || [])
           wx.navigateTo({
             url: `/pages/report/report?time=${res.elapsed_seconds}`
           })
         } else if (res.status === 'failed') {
           this._finishWithError('分析失败', res.error || '未知错误')
         } else {
-          // pending / running：更新真实进度，继续轮询
-          if (res.progress) {
-            wx.showLoading({ title: res.progress, mask: true })
+          // pending / running：跟随后端真实进度更新文案与进度条
+          if (res.progress && STAGE_MAP[res.progress]) {
+            this._setStage(STAGE_MAP[res.progress])
           }
           if (attempts >= POLL_MAX_ATTEMPTS) {
             this._finishWithError('处理超时', '任务仍在后台执行，请稍后重试')
@@ -140,8 +156,33 @@ Page({
     }, POLL_INTERVAL)
   },
 
+  _setStage(stage) {
+    this.setData({ stageText: stage.text, progressPercent: stage.percent })
+  },
+
+  // 本地计时：即使后端长时间不推进度，进度条也在缓慢前进，避免「卡死」观感
+  _startTicker() {
+    this._stopTicker()
+    this._startTime = Date.now()
+    this._ticker = setInterval(() => {
+      const percent = Math.min(this.data.progressPercent + 1, 95)
+      this.setData({
+        elapsedSec: Math.floor((Date.now() - this._startTime) / 1000),
+        progressPercent: percent,
+        etaSec: Math.max(Math.ceil((95 - percent) / 6), 2)
+      })
+    }, 1000)
+  },
+
+  _stopTicker() {
+    if (this._ticker) {
+      clearInterval(this._ticker)
+      this._ticker = null
+    }
+  },
+
   _finishWithError(title, content) {
-    wx.hideLoading()
+    this._stopTicker()
     this.setData({ loading: false })
     wx.showModal({ title, content, showCancel: false })
   },
@@ -159,5 +200,6 @@ Page({
       clearTimeout(this._pollTimer)
       this._pollTimer = null
     }
+    this._stopTicker()
   }
 })

@@ -5,6 +5,7 @@ import os
 from contextlib import contextmanager
 
 import pymysql
+import pymysql.cursors
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -17,6 +18,9 @@ DB_CONFIG = {
     "database": os.getenv("DB_NAME", "fitness_db"),
     "charset": "utf8mb4",
     "autocommit": False,
+    # 调用方普遍按 row["字段"] / row.get() 取值，必须用字典游标；
+    # 默认 Cursor 返回 tuple，会导致 _get_task 直接抛 AttributeError。
+    "cursorclass": pymysql.cursors.DictCursor,
 }
 
 

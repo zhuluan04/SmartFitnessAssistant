@@ -93,27 +93,36 @@ def get_tracer() -> ToolCallTracer:
 
 
 # 4. Web 搜索工具（Tavily）
+# 【默认关闭】食材 → 食谱属于模型的固有常识，联网搜索是端到端耗时的主要来源：
+# 单次 2-5s，且返回的数千 token 会回填下一轮上下文，拖慢其后每次 LLM 调用。
+# 仅在需要覆盖极冷门食材时，通过环境变量 ENABLE_WEB_SEARCH=1 开启。
 web_search = TavilySearch(
-    max_results=5,
+    max_results=3,
     topic="general",
 )
 
+ENABLE_WEB_SEARCH = os.getenv("ENABLE_WEB_SEARCH", "0") == "1"
+
 # 5. 文本模型（阿里云百炼 Qwen3.5-Plus，OpenAI 兼容模式）
+# enable_thinking=False：本任务只需结构化抽取与工具调用，不需要长思考链。
+# 开启思考时单轮生成可长达 40s+，是端到端耗时的绝对大头。
 text_model = init_chat_model(
     model="qwen3.5-plus",
     model_provider="openai",
     base_url=os.getenv("DASHSCOPE_BASE_URL"),
     api_key=os.getenv("DASHSCOPE_API_KEY"),
     temperature=0.3,   # 降低随机性，减少菜谱推荐的跳跃性
+    extra_body={"enable_thinking": False},
 )
 
 # 5b. 视觉模型（用于图片输入场景）
 vision_model = init_chat_model(
-    model="qwen-vl-plus",
+    model="qwen3-vl-plus",
     model_provider="openai",
     base_url=os.getenv("DASHSCOPE_BASE_URL"),
     api_key=os.getenv("DASHSCOPE_API_KEY"),
     temperature=0.3,
+    extra_body={"enable_thinking": False},
 )
 
 # 7. 卡路里计算工具（本地热量表 + USDA 兜底，见 app/tools/nutrition.py）
@@ -375,87 +384,26 @@ def encode_image_to_base64(image_path: str) -> tuple[str, str]:
     return mime_type, image_data
 
 
-# 10. Agent 系统提示词（防幻觉版）
-# ═══════════════════════════════════════════════════════════
-# 设计原则：
-# 1. 热量数值必须来自工具返回值，禁止模型自行编造。
-# 2. 每次调用结束时必须在输出末尾附上工具调用轨迹摘要。
-# 3. 未收录食材不计入总热量，并明确标记"总热量不完整"。
-# 4. 成品食物只输出估算值 + 置信度 + 误差范围，不伪装精确值。
-# ═══════════════════════════════════════════════════════════
-system_prompt = """
-你是一名私人厨师兼营养师。收到用户提供的食材照片或清单后，请严格按以下流程操作。
-
-## 第一步：判断食物状态
-若用户收到照片，首先判断图片中的食物状态：
-- **食材状态**：未经烹饪的原始食材（如生肉、蔬菜、水果等）
-- **成品状态**：已经做好的菜肴或食物
-
-## 第二步：根据状态执行不同流程
-
-### 情况A：如果是【食材】
-1. **识别食材**：辨识所有可见食材，整理出"当前可用食材清单"（含预估重量，单位：克）。
-
-2. **智能食谱检索**：必须调用 web_search 工具，以可用食材清单 + 健身目标为核心关键词，
-   查找可行菜谱。**严禁在未调用工具的情况下凭空编造菜谱**。
-
-3. **精准卡路里核算**：
-   - 对筛选出的候选食谱，**必须调用 calculate_food_calories 工具**计算总卡路里。
-   - 🔴 **核心规则：最终报告表格中的"总卡路里"数值必须直接取自 calculate_food_calories 返回值的"已收录食材总卡路里"字段。禁止自行估算或编造。**
-   - 若工具返回"包含未收录食材: true"，则在该食谱的推荐理由中注明"⚠️ 总热量不完整（某食材未收录）"。
-   - 若工具未返回任何数值，则必须输出"❌ 热量计算失败"而不是编造数字。
-
-4. **多维度评估与排序**：从"营养价值"和"制作难度"两个维度对候选食谱进行 1-10 分打分。
-
-5. **结构化输出**：严格按以下 Markdown 表格格式输出：
-   | 排名 | 食谱名称 | 总卡路里 | 营养得分 | 难度得分 | 推荐理由 |
-   |---|---|---|---|---|---|
-   | 1 | ... | ... | ... | ... | ... |
-   表格下方附上每道菜的一句话做法概述。
-
-### 情况B：如果是【成品食物】
-1. **识别食物**：辨识图片中所有可见的食物/菜品。
-
-2. **估算热量**（注意：成品食物无法精确计算）：
-   - **必须调用 estimate_meal_calories 工具**，对每道菜逐一估算。
-   - 提供菜品名称、估计份量和你知道的主要原料。
-   - 🔴 **核心规则：最终报告中的热量必须来自工具返回的"估算卡路里"字段，并同时列出置信度和误差范围。禁止自行编造数值。**
-   - **输出格式要求**：热量必须表达为"估算值 ± 误差范围"的形式，并标注置信度。
-   - 示例：`约 350 ± 88 kcal（置信度：中）`
-
-3. **营养分析**：简要分析该餐的营养构成（蛋白质、碳水、脂肪比例），标注此为估算。
-
-4. **结构化输出**：
-   | 食物名称 | 估计份量 | 估算热量 | 置信度 | 说明 |
-   |---|---|---|---|---|
-   | ... | ... | ... | ... | ... |
-   表格末尾注明：⚠️ 以上热量为估算值，仅供参考。
-
-### 第三步：附上工具调用轨迹
-在报告末尾，输出以下分隔线及工具调用摘要：
----
-**工具调用轨迹**
-1. ✅ web_search — 搜索了关键词：[...]
-2. ✅ calculate_food_calories — 计算了食材：[...]，返回：已收录 xxx kcal，未收录：[...]
-
-## 重要注意事项（违反将导致不正确结果）
-- 📌 热量数值**必须来源于工具返回值**，严禁模型自行估算热量数值。
-- 📌 未收录食材**不计入总热量**，并明确标记"⚠️ 总热量不完整"。
-- 📌 成品食物**只允许输出"估算值 + 置信度 + 误差范围"**，不允许伪装成精确值。
-- 📌 工具调用失败时必须告知用户失败原因，而不是自行编造替代结果。
-- 📌 如果用户提供的食材在热量表中找不到，如实告知用户。
-"""
+# 10. Agent 系统提示词（结构化输出版）
+# 输出契约与防幻觉规则集中在 app/core/prompts.py，便于单独调参与回归测试。
+from app.core.prompts import SYSTEM_PROMPT as system_prompt
 
 # 7. 创建 Agent（文本模式 + 视觉模式）
+# 热量计算走本地热量表（毫秒级，不是耗时来源）；
+# estimate_meal_calories 供成品菜肴图片使用（原实现漏注册，导致情况B无法走工具）。
+_AGENT_TOOLS = [calculate_food_calories, estimate_meal_calories]
+if ENABLE_WEB_SEARCH:
+    _AGENT_TOOLS.insert(0, web_search)
+
 text_agent = create_agent(
     model=text_model,
-    tools=[web_search, calculate_food_calories],
+    tools=_AGENT_TOOLS,
     system_prompt=system_prompt,
 )
 
 vision_agent = create_agent(
     model=vision_model,
-    tools=[web_search, calculate_food_calories],
+    tools=_AGENT_TOOLS,
     system_prompt=system_prompt,
 )
 

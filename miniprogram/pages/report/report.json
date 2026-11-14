@@ -1,6 +1,4 @@
 {
-  "usingComponents": {
-    "mp-html": "/components/mp-html/index"
-  },
+  "usingComponents": {},
   "navigationBarTitleText": "营养报告"
 }

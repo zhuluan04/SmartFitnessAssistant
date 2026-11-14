@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field, model_validator
 from langchain_core.callbacks import BaseCallbackHandler
 
 from app.langchain import text_agent, vision_agent, invoke_agent_with_trace
+from app.core.parser import extract_json, normalize_diet_report
 from app.services.database import get_conn
 
 logger = logging.getLogger("calorie_agent")
@@ -85,20 +86,37 @@ _TASK_FIELDS = {"status", "progress", "result", "error"}
 
 
 class TaskProgressCallback(BaseCallbackHandler):
-    """监听真实工具调用事件，推送进度节点（事件驱动的真进度）"""
+    """监听真实工具调用事件，推送进度节点（只前进，不回退）"""
+
+    _ORDER = {PROGRESS_RECOGNIZING: 1, PROGRESS_SEARCHING: 2,
+              PROGRESS_CALCULATING: 3, PROGRESS_GENERATING: 4}
 
     def __init__(self, task_id: str):
         self.task_id = task_id
+        self._stage = 1
+
+    def _advance(self, stage: str):
+        """进度只能前进：否则工具调用会把状态拉回上一阶段，前端文案来回闪跳"""
+        if self._ORDER[stage] > self._stage:
+            self._stage = self._ORDER[stage]
+            _update_task(self.task_id, progress=stage)
 
     def on_tool_start(self, serialized: dict, input_str: str, **kwargs):
         tool_name = serialized.get("name", "")
         if tool_name == "web_search":
-            _update_task(self.task_id, progress=PROGRESS_SEARCHING)
+            self._advance(PROGRESS_SEARCHING)
         elif tool_name in ("calculate_food_calories", "estimate_meal_calories"):
-            _update_task(self.task_id, progress=PROGRESS_CALCULATING)
+            self._advance(PROGRESS_CALCULATING)
 
     def on_llm_end(self, response, **kwargs):
-        _update_task(self.task_id, progress=PROGRESS_GENERATING)
+        """仅当本轮 LLM 未产出 tool_calls 时，才判定为「正在生成最终报告」"""
+        try:
+            message = response.generations[0][0].message
+            has_tool_calls = bool(getattr(message, "tool_calls", None))
+        except (AttributeError, IndexError, TypeError):
+            has_tool_calls = True
+        if not has_tool_calls:
+            self._advance(PROGRESS_GENERATING)
 
 
 def _create_task(task_id: str, status: str = "pending", progress: str | None = None,
@@ -198,7 +216,8 @@ class ToolCallInfo(BaseModel):
 
 class DietResponse(BaseModel):
     success: bool
-    report: str | None = None
+    report: str | None = None        # 模型原文（解析失败时的兜底展示）
+    report_data: dict | None = None  # 结构化报告（前端卡片渲染优先使用）
     elapsed_seconds: float | None = None
     error: str | None = None
     tool_trace: list[ToolCallInfo] | None = None
@@ -220,7 +239,8 @@ class TaskStatusResponse(BaseModel):
     task_id: str
     status: str  # pending / running / success / failed
     progress: str | None = None      # 识别中 / 搜索中 / 计算中 / 生成报告中
-    report: str | None = None
+    report: str | None = None        # 模型原文（解析失败时的兜底展示）
+    report_data: dict | None = None  # 结构化报告（前端卡片渲染优先使用）
     elapsed_seconds: float | None = None
     error: str | None = None
     tool_trace: list[ToolCallInfo] | None = None
@@ -318,7 +338,7 @@ async def health():
         db_ok = False
     return {
         "status": "ok",
-        "model": "qwen3.5-plus + qwen-vl-plus",
+        "model": "qwen3.5-plus + qwen3-vl-plus",
         "database": "ok" if db_ok else "unavailable",
     }
 
@@ -361,9 +381,14 @@ def generate_diet(req: DietRequest, _: None = Depends(verify_api_token)):
         called_tools = {t["tool"] for t in trace if t["status"] == "completed"}
         calorie_tool_called = bool(called_tools & calorie_tools)
 
+        # 结构化解析：失败时 report_data 为 None，前端降级为纯文本展示
+        raw_data = extract_json(report)
+        report_data = normalize_diet_report(raw_data) if raw_data else None
+
         if not calorie_tool_called:
             logger.warning("⚠️ API 调用中未调用热量计算工具，热量数据可信度低！")
-            report += "\n\n---\n⚠️ **注意**：本次分析未成功调用热量计算工具，热量数据可信度较低。"
+            if report_data is not None:
+                report_data["warning"] = "本次分析未成功调用热量计算工具，热量数据可信度较低。"
 
         # 构造工具调用轨迹（截断过长的输入/输出）
         tool_trace = []
@@ -384,6 +409,7 @@ def generate_diet(req: DietRequest, _: None = Depends(verify_api_token)):
         return DietResponse(
             success=True,
             report=report,
+            report_data=report_data,
             elapsed_seconds=elapsed,
             tool_trace=tool_trace,
         )
@@ -440,8 +466,9 @@ def _run_diet_task(task_id: str, req: DietRequest):
             extra_callbacks=[TaskProgressCallback(task_id)],
         )
 
-        # ── 节点 3：计算中（验证热量工具调用） ──
-        _update_task(task_id, progress=PROGRESS_CALCULATING)
+        # ── 节点 3：解析结构化报告 + 验证热量工具调用 ──
+        raw_data = extract_json(report)
+        report_data = normalize_diet_report(raw_data) if raw_data else None
 
         calorie_tools = {"calculate_food_calories", "estimate_meal_calories"}
         called_tools = {t["tool"] for t in trace if t["status"] == "completed"}
@@ -449,9 +476,10 @@ def _run_diet_task(task_id: str, req: DietRequest):
 
         if not calorie_tool_called:
             logger.warning("⚠️ 异步任务中未调用热量计算工具，热量数据可信度低！")
-            report += "\n\n---\n⚠️ **注意**：本次分析未成功调用热量计算工具，热量数据可信度较低。"
+            if report_data is not None:
+                report_data["warning"] = "本次分析未成功调用热量计算工具，热量数据可信度较低。"
 
-        # ── 节点 4：生成报告中（构造工具调用轨迹） ──
+        # ── 节点 4：构造工具调用轨迹（仅供调试面板，不再写入报告正文） ──
         _update_task(task_id, progress=PROGRESS_GENERATING)
 
         tool_trace = []
@@ -474,6 +502,7 @@ def _run_diet_task(task_id: str, req: DietRequest):
         # ── 完成：标记 success ──
         result_dict = {
             "report": report,
+            "report_data": report_data,
             "elapsed_seconds": elapsed,
             "tool_trace": [t.model_dump() for t in tool_trace],
         }
@@ -545,6 +574,7 @@ def get_diet_task_status(task_id: str, _: None = Depends(verify_api_token)):
 
     if result:
         resp.report = result.get("report")
+        resp.report_data = result.get("report_data")
         resp.elapsed_seconds = result.get("elapsed_seconds")
         trace_raw = result.get("tool_trace")
         if trace_raw:
